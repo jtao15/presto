@@ -89,6 +89,7 @@ import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.FIXED_HASH_DISTRIBUTION;
 import static io.prestosql.testing.assertions.Assert.assertEquals;
+import static io.prestosql.tracer.NoOpTracerFactory.createNoOpTracer;
 import static java.lang.String.format;
 import static java.util.Arrays.asList;
 import static java.util.Collections.nCopies;
@@ -235,7 +236,7 @@ public class TestHashJoinOperator
 
         instantiateBuildDrivers(buildSideSetup, taskContext);
         buildLookupSource(buildSideSetup);
-        Operator operator = joinOperatorFactory.createOperator(driverContext);
+        Operator operator = joinOperatorFactory.createOperator(driverContext, createNoOpTracer());
         assertTrue(operator.needsInput());
         operator.addInput(probeInput.get(0));
         operator.finish();
@@ -403,7 +404,7 @@ public class TestHashJoinOperator
         checkState(buildOperatorCount == whenSpill.size());
         LookupSourceFactory lookupSourceFactory = lookupSourceFactoryManager.getJoinBridge(Lifespan.taskWide());
 
-        try (Operator joinOperator = joinOperatorFactory.createOperator(joinDriverContext)) {
+        try (Operator joinOperator = joinOperatorFactory.createOperator(joinDriverContext, createNoOpTracer())) {
             // build lookup source
             ListenableFuture<LookupSourceProvider> lookupSourceProvider = lookupSourceFactory.createLookupSourceProvider();
             List<Boolean> revoked = new ArrayList<>(nCopies(buildOperatorCount, false));
@@ -438,9 +439,9 @@ public class TestHashJoinOperator
             PageBufferOperatorFactory pageBufferOperatorFactory = new PageBufferOperatorFactory(18, new PlanNodeId("pageBuffer"), pageBuffer);
 
             Driver joinDriver = Driver.createDriver(joinDriverContext,
-                    valuesOperatorFactory.createOperator(joinDriverContext),
+                    valuesOperatorFactory.createOperator(joinDriverContext, createNoOpTracer()),
                     joinOperator,
-                    pageBufferOperatorFactory.createOperator(joinDriverContext));
+                    pageBufferOperatorFactory.createOperator(joinDriverContext, createNoOpTracer()));
             while (!called.get()) { // process first row of first page of LookupJoinOperator
                 processRow(joinDriver, taskStateMachine);
             }
@@ -1053,7 +1054,7 @@ public class TestHashJoinOperator
         // drivers and operators
         instantiateBuildDrivers(buildSideSetup, taskContext);
         buildLookupSource(buildSideSetup);
-        Operator operator = joinOperatorFactory.createOperator(taskContext.addPipelineContext(0, true, true, false).addDriverContext());
+        Operator operator = joinOperatorFactory.createOperator(taskContext.addPipelineContext(0, true, true, false).addDriverContext(), createNoOpTracer());
 
         List<Page> pages = probePages.row("test").build();
         operator.addInput(pages.get(0));
@@ -1089,7 +1090,7 @@ public class TestHashJoinOperator
         // drivers and operators
         instantiateBuildDrivers(buildSideSetup, taskContext);
         buildLookupSource(buildSideSetup);
-        Operator operator = joinOperatorFactory.createOperator(taskContext.addPipelineContext(0, true, true, false).addDriverContext());
+        Operator operator = joinOperatorFactory.createOperator(taskContext.addPipelineContext(0, true, true, false).addDriverContext(), createNoOpTracer());
 
         List<Page> pages = probePages.row("test").build();
         operator.addInput(pages.get(0));
@@ -1234,7 +1235,7 @@ public class TestHashJoinOperator
         OperatorFactory joinOperatorFactory = createJoinOperatorFactoryWithBlockingLookupSource(taskContext, parallelBuild, probeHashEnabled, buildHashEnabled);
 
         DriverContext driverContext = taskContext.addPipelineContext(0, true, true, false).addDriverContext();
-        try (Operator joinOperator = joinOperatorFactory.createOperator(driverContext)) {
+        try (Operator joinOperator = joinOperatorFactory.createOperator(driverContext, createNoOpTracer())) {
             joinOperatorFactory.noMoreOperators();
             assertFalse(joinOperator.needsInput());
             joinOperator.finish();
@@ -1254,7 +1255,7 @@ public class TestHashJoinOperator
         OperatorFactory joinOperatorFactory = createJoinOperatorFactoryWithBlockingLookupSource(taskContext, parallelBuild, probeHashEnabled, buildHashEnabled);
 
         DriverContext driverContext = taskContext.addPipelineContext(0, true, true, false).addDriverContext();
-        try (Operator joinOperator = joinOperatorFactory.createOperator(driverContext)) {
+        try (Operator joinOperator = joinOperatorFactory.createOperator(driverContext, createNoOpTracer())) {
             joinOperatorFactory.noMoreOperators();
             assertFalse(joinOperator.needsInput());
             assertNull(joinOperator.getOutput());
@@ -1376,8 +1377,8 @@ public class TestHashJoinOperator
         ValuesOperatorFactory valuesOperatorFactory = new ValuesOperatorFactory(0, new PlanNodeId("values"), buildPages.build());
         LocalExchangeSinkOperatorFactory sinkOperatorFactory = new LocalExchangeSinkOperatorFactory(localExchangeFactory, 1, new PlanNodeId("sink"), localExchangeSinkFactoryId, Function.identity());
         Driver sourceDriver = Driver.createDriver(collectDriverContext,
-                valuesOperatorFactory.createOperator(collectDriverContext),
-                sinkOperatorFactory.createOperator(collectDriverContext));
+                valuesOperatorFactory.createOperator(collectDriverContext, createNoOpTracer()),
+                sinkOperatorFactory.createOperator(collectDriverContext, createNoOpTracer()));
         valuesOperatorFactory.noMoreOperators();
         sinkOperatorFactory.noMoreOperators();
 
@@ -1424,10 +1425,10 @@ public class TestHashJoinOperator
         List<HashBuilderOperator> buildOperators = new ArrayList<>();
         for (int i = 0; i < buildSideSetup.getPartitionCount(); i++) {
             DriverContext buildDriverContext = buildPipeline.addDriverContext();
-            HashBuilderOperator buildOperator = buildSideSetup.getBuildOperatorFactory().createOperator(buildDriverContext);
+            HashBuilderOperator buildOperator = buildSideSetup.getBuildOperatorFactory().createOperator(buildDriverContext, createNoOpTracer());
             Driver driver = Driver.createDriver(
                     buildDriverContext,
-                    buildSideSetup.getBuildSideSourceOperatorFactory().createOperator(buildDriverContext),
+                    buildSideSetup.getBuildSideSourceOperatorFactory().createOperator(buildDriverContext, createNoOpTracer()),
                     buildOperator);
             buildDrivers.add(driver);
             buildOperators.add(buildOperator);

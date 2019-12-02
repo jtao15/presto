@@ -29,6 +29,7 @@ import io.prestosql.operator.WorkProcessor.ProcessState;
 import io.prestosql.operator.WorkProcessorOperatorAdapter.ProcessorContext;
 import io.prestosql.spi.Page;
 import io.prestosql.spi.connector.UpdatablePageSource;
+import io.prestosql.spi.tracer.Tracer;
 import io.prestosql.sql.planner.plan.PlanNodeId;
 
 import javax.annotation.Nullable;
@@ -705,7 +706,7 @@ public class WorkProcessorPipelineSourceOperator
         }
 
         @Override
-        public SourceOperator createOperator(DriverContext driverContext)
+        public SourceOperator createOperator(DriverContext driverContext, Tracer driverTracer)
         {
             checkState(!closed, "Factory is already closed");
             return new WorkProcessorPipelineSourceOperator(operatorId, driverContext, sourceOperatorFactory, operatorFactories);
