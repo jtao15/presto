@@ -24,6 +24,7 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.eventlistener.QueryCompletedEvent;
 import io.prestosql.spi.eventlistener.QueryCreatedEvent;
 import io.prestosql.spi.eventlistener.SplitCompletedEvent;
+import io.prestosql.spi.eventlistener.TracerEvent;
 import io.prestosql.testing.DistributedQueryRunner;
 import io.prestosql.testing.MaterializedResult;
 import org.intellij.lang.annotations.Language;
@@ -31,6 +32,8 @@ import org.testng.annotations.AfterClass;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -60,6 +63,7 @@ public class TestEventListener
     {
         session = testSessionBuilder()
                 .setSystemProperty("task_concurrency", "1")
+                .setSystemProperty("query_debugging_tracer_enabled", "true")
                 .setCatalog("tpch")
                 .setSchema("tiny")
                 .setClientInfo("{\"clientVersion\":\"testVersion\"}")
@@ -127,6 +131,9 @@ public class TestEventListener
         List<SplitCompletedEvent> splitCompletedEvents = generatedEvents.getSplitCompletedEvents();
         assertEquals(splitCompletedEvents.get(0).getQueryId(), queryCompletedEvent.getMetadata().getQueryId());
         assertEquals(splitCompletedEvents.get(0).getStatistics().getCompletedPositions(), 1);
+
+        List<TracerEvent> tracerEvents = generatedEvents.getTracerEvents();
+        assertFalse(tracerEvents.isEmpty());
     }
 
     @Test
@@ -159,6 +166,9 @@ public class TestEventListener
 
         List<SplitCompletedEvent> splitCompletedEvents = generatedEvents.getSplitCompletedEvents();
         assertEquals(splitCompletedEvents.size(), SPLITS_PER_NODE + 2); // leaf splits + aggregation split
+
+        List<TracerEvent> tracerEvents = generatedEvents.getTracerEvents();
+        assertFalse(tracerEvents.isEmpty());
 
         // All splits must have the same query ID
         Set<String> actual = splitCompletedEvents.stream()
@@ -270,6 +280,7 @@ public class TestEventListener
         private ImmutableList.Builder<QueryCreatedEvent> queryCreatedEvents;
         private ImmutableList.Builder<QueryCompletedEvent> queryCompletedEvents;
         private ImmutableList.Builder<SplitCompletedEvent> splitCompletedEvents;
+        private List<TracerEvent> tracerEvents;
 
         private CountDownLatch eventsLatch;
 
@@ -278,6 +289,7 @@ public class TestEventListener
             queryCreatedEvents = ImmutableList.builder();
             queryCompletedEvents = ImmutableList.builder();
             splitCompletedEvents = ImmutableList.builder();
+            tracerEvents = Collections.synchronizedList(new ArrayList<>());
 
             eventsLatch = new CountDownLatch(numEvents);
         }
@@ -306,6 +318,11 @@ public class TestEventListener
             eventsLatch.countDown();
         }
 
+        public synchronized void addTracerEventOccurred(TracerEvent event)
+        {
+            tracerEvents.add(event);
+        }
+
         public List<QueryCreatedEvent> getQueryCreatedEvents()
         {
             return queryCreatedEvents.build();
@@ -319,6 +336,11 @@ public class TestEventListener
         public List<SplitCompletedEvent> getSplitCompletedEvents()
         {
             return splitCompletedEvents.build();
+        }
+
+        public List<TracerEvent> getTracerEvents()
+        {
+            return tracerEvents;
         }
     }
 }
