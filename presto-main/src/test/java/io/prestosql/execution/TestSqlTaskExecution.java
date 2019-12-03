@@ -131,7 +131,10 @@ public class TestSqlTaskExecution
         taskExecutor.start();
 
         try {
-            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf("task-id"), taskNotificationExecutor);
+            final String queryId = "0";
+            final String stageId = "1";
+            final String taskId = "2";
+            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf(queryId + "." + stageId + "." + taskId), taskNotificationExecutor);
             PartitionedOutputBuffer outputBuffer = newTestingOutputBuffer(taskNotificationExecutor);
             OutputBufferConsumer outputBufferConsumer = new OutputBufferConsumer(outputBuffer, OUTPUT_BUFFER_ID);
 
@@ -300,7 +303,10 @@ public class TestSqlTaskExecution
         taskExecutor.start();
 
         try {
-            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf("task-id"), taskNotificationExecutor);
+            final String queryId = "0";
+            final String stageId = "1";
+            final String taskId = "2";
+            TaskStateMachine taskStateMachine = new TaskStateMachine(TaskId.valueOf(queryId + "." + stageId + "." + taskId), taskNotificationExecutor);
             PartitionedOutputBuffer outputBuffer = newTestingOutputBuffer(taskNotificationExecutor);
             OutputBufferConsumer outputBufferConsumer = new OutputBufferConsumer(outputBuffer, OUTPUT_BUFFER_ID);
 
@@ -418,6 +424,7 @@ public class TestSqlTaskExecution
                     ImmutableList.of(scan2NodeId, scan0NodeId),
                     executionStrategy == GROUPED_EXECUTION ? StageExecutionDescriptor.fixedLifespanScheduleGroupedExecution(ImmutableList.of(scan0NodeId, scan2NodeId)) : StageExecutionDescriptor.ungroupedExecution());
             TaskContext taskContext = newTestingTaskContext(taskNotificationExecutor, driverYieldExecutor, taskStateMachine);
+
             SqlTaskExecution sqlTaskExecution = SqlTaskExecution.createSqlTaskExecution(
                     taskStateMachine,
                     taskContext,

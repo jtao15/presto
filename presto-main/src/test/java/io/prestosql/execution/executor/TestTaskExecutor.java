@@ -21,12 +21,20 @@ import io.airlift.testing.TestingTicker;
 import io.airlift.units.Duration;
 import io.prestosql.execution.SplitRunner;
 import io.prestosql.execution.TaskId;
+import io.prestosql.spi.eventlistener.TracerEvent;
+import io.prestosql.spi.tracer.DefaultTracer;
 import io.prestosql.spi.tracer.Tracer;
+import io.prestosql.spi.tracer.TracerEventType;
 import org.testng.annotations.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.OptionalInt;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -37,6 +45,11 @@ import static io.airlift.testing.Assertions.assertGreaterThan;
 import static io.airlift.testing.Assertions.assertLessThan;
 import static io.prestosql.execution.executor.MultilevelSplitQueue.LEVEL_CONTRIBUTION_CAP;
 import static io.prestosql.execution.executor.MultilevelSplitQueue.LEVEL_THRESHOLD_SECONDS;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_DESTROYED;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_DRIVER_CREATED;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_FINISHED;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_SCHEDULED;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_STARTS_WAITING;
 import static io.prestosql.tracer.NoOpTracerFactory.createNoOpTracer;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -66,7 +79,9 @@ public class TestTaskExecutor
             verificationComplete.register();
 
             // add two jobs
-            TestingJob driver1 = new TestingJob(ticker, new Phaser(), beginPhase, verificationComplete, 10, 0);
+            List<TracerEvent> tracerEvents = Collections.synchronizedList(new ArrayList<>());
+            Tracer tracer = DefaultTracer.createBasicTracer(event -> tracerEvents.add(event), "driver1", true);
+            TestingJob driver1 = new TestingJob(ticker, new Phaser(), beginPhase, verificationComplete, 10, 0, tracer);
             ListenableFuture<?> future1 = getOnlyElement(taskExecutor.enqueueSplits(taskHandle, true, ImmutableList.of(driver1)));
             TestingJob driver2 = new TestingJob(ticker, new Phaser(), beginPhase, verificationComplete, 10, 0);
             ListenableFuture<?> future2 = getOnlyElement(taskExecutor.enqueueSplits(taskHandle, true, ImmutableList.of(driver2)));
@@ -136,6 +151,13 @@ public class TestTaskExecutor
             // no splits remaining
             ticker.increment(610, SECONDS);
             assertEquals(taskExecutor.getRunAwaySplitCount(), 0);
+
+            future1.addListener(() -> {
+                TracerEventType[] actionsOccursOnlyOnce = {SPLIT_DRIVER_CREATED, SPLIT_FINISHED, SPLIT_DESTROYED};
+                TracerEventType[] actionsOccursAtLeastOnce = {SPLIT_SCHEDULED, SPLIT_STARTS_WAITING};
+                checkTracerEventsOccursOnlyOnce(actionsOccursOnlyOnce, tracerEvents);
+                checkTracerEventsOccursAtLeastOnce(actionsOccursAtLeastOnce, tracerEvents); },
+                    Executors.newSingleThreadExecutor());
         }
         finally {
             taskExecutor.stop();
@@ -445,6 +467,40 @@ public class TestTaskExecutor
         }
     }
 
+    private void checkTracerEventsOccursOnlyOnce(TracerEventType[] actions, List<TracerEvent> tracerEvents)
+    {
+        Map<String, Integer> counts = new HashMap<>();
+        for (TracerEventType action : actions) {
+            counts.put(action.name(), 0);
+        }
+        for (TracerEvent event : tracerEvents) {
+            String actionType = event.getEventType();
+            if (counts.containsKey(actionType)) {
+                counts.put(actionType, counts.get(actionType) + 1);
+            }
+        }
+        for (Map.Entry<String, Integer> countEntry : counts.entrySet()) {
+            assertEquals(countEntry.getValue().intValue(), 1);
+        }
+    }
+
+    private void checkTracerEventsOccursAtLeastOnce(TracerEventType[] actions, List<TracerEvent> tracerEvents)
+    {
+        Map<String, Integer> counts = new HashMap<>();
+        for (TracerEventType action : actions) {
+            counts.put(action.name(), 0);
+        }
+        for (TracerEvent event : tracerEvents) {
+            String actionType = event.getEventType();
+            if (counts.containsKey(actionType)) {
+                counts.put(actionType, counts.get(actionType) + 1);
+            }
+        }
+        for (Map.Entry<String, Integer> countEntry : counts.entrySet()) {
+            assertTrue(countEntry.getValue().intValue() >= 1);
+        }
+    }
+
     private void assertSplitStates(int endIndex, TestingJob[] splits)
     {
         // assert that splits up to and including endIndex are all started
@@ -488,6 +544,8 @@ public class TestTaskExecutor
         private final AtomicBoolean started = new AtomicBoolean();
         private final SettableFuture<?> completed = SettableFuture.create();
 
+        private Tracer tracer;
+
         public TestingJob(TestingTicker ticker, Phaser globalPhaser, Phaser beginQuantaPhaser, Phaser endQuantaPhaser, int requiredPhases, int quantaTimeMillis)
         {
             this.ticker = ticker;
@@ -503,6 +561,12 @@ public class TestTaskExecutor
             if (globalPhaser.getRegisteredParties() == 0) {
                 globalPhaser.register();
             }
+        }
+
+        public TestingJob(TestingTicker ticker, Phaser globalPhaser, Phaser beginQuantaPhaser, Phaser endQuantaPhaser, int requiredPhases, int quantaTimeMillis, Tracer tracer)
+        {
+            this(ticker, globalPhaser, beginQuantaPhaser, endQuantaPhaser, requiredPhases, quantaTimeMillis);
+            this.tracer = tracer;
         }
 
         private int getFirstPhase()
@@ -523,7 +587,7 @@ public class TestTaskExecutor
         @Override
         public Tracer getTracer()
         {
-            return createNoOpTracer();
+            return tracer == null ? createNoOpTracer() : tracer;
         }
 
         @Override

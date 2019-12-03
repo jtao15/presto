@@ -319,6 +319,7 @@ public class TaskExecutor
                         globalScheduledTimeMicros,
                         blockedQuantaWallTime,
                         unblockedQuantaWallTime);
+                prioritizedSplitRunner.splitDriverCreated();
 
                 if (taskHandle.isDestroyed()) {
                     // If the handle is destroyed, we destroy the task splits to complete the future
@@ -478,6 +479,7 @@ public class TaskExecutor
                         RunningSplitInfo splitInfo = new RunningSplitInfo(ticker.read(), threadId, Thread.currentThread());
                         runningSplitInfos.add(splitInfo);
                         runningSplits.add(split);
+                        split.addedToRunning();
 
                         ListenableFuture<?> blocked;
                         try {
@@ -490,18 +492,22 @@ public class TaskExecutor
 
                         if (split.isFinished()) {
                             log.debug("%s is finished", split.getInfo());
+                            split.removedFromTracking();
                             splitFinished(split);
                         }
                         else {
                             if (blocked.isDone()) {
                                 waitingSplits.offer(split);
+                                split.addedToWaiting();
                             }
                             else {
                                 blockedSplits.put(split, blocked);
+                                split.addedToBlocked();
                                 blocked.addListener(() -> {
                                     blockedSplits.remove(split);
                                     // reset the level priority to prevent previously-blocked splits from starving existing splits
                                     split.resetLevelPriority();
+                                    split.removedFromBlocked();
                                     waitingSplits.offer(split);
                                 }, executor);
                             }

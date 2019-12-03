@@ -391,6 +391,7 @@ public class SqlTask
                             .newTracerWithStageId(String.valueOf(taskStateMachine.getTaskId().getStageId().getId()))
                             .newTracerWithStageId(String.valueOf(taskStateMachine.getTaskId().getId()))
                             .newTracerWithNodeId(nodeId);
+                    this.taskStateMachine.addStateChangeListener((state) -> tracer.emitEvent(state.toTracerEventType(), null));
                     taskExecution = sqlTaskExecutionFactory.create(session, queryContext, taskStateMachine, outputBuffer, fragment.get(), sources, totalPartitions, tracer);
                     taskHolderReference.compareAndSet(taskHolder, new TaskHolder(taskExecution));
                     needsPlan.set(false);

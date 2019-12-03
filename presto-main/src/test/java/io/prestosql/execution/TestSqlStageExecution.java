@@ -56,6 +56,9 @@ import static io.prestosql.execution.SqlStageExecution.createSqlStageExecution;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.ARBITRARY;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.operator.StageExecutionDescriptor.ungroupedExecution;
+import static io.prestosql.spi.tracer.TracerEventType.SCHEDULE_TASK_WITH_SPLITS;
+import static io.prestosql.spi.tracer.TracerEventType.STAGE_STATE_CHANGE_ABORTED;
+import static io.prestosql.spi.tracer.TracerEventType.STAGE_STATE_CHANGE_PLANNED;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUTION;
@@ -64,6 +67,7 @@ import static java.util.concurrent.Executors.newCachedThreadPool;
 import static java.util.concurrent.Executors.newScheduledThreadPool;
 import static java.util.concurrent.TimeUnit.MINUTES;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertSame;
 import static org.testng.Assert.assertTrue;
 
@@ -162,6 +166,35 @@ public class TestSqlStageExecution
 
         // cancel the background thread adding tasks
         addTasksTask.cancel(true);
+
+        // check tracer events
+        try {
+            // wait a second for events to propagate
+            Thread.sleep(1000);
+        }
+        catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        assertTrue(tracerEvents.size() > 2);
+        boolean stageChangeToPlanned = false;
+        boolean stageChangeToAborted = false;
+        boolean scheduledTaskWithSplits = false;
+        for (TracerEvent event : tracerEvents) {
+            String actionType = event.getEventType();
+            if (actionType.equals(STAGE_STATE_CHANGE_PLANNED.name())) {
+                stageChangeToPlanned = true;
+            }
+            else if (actionType.equals(STAGE_STATE_CHANGE_ABORTED.name())) {
+                stageChangeToAborted = true;
+            }
+            else if (actionType.equals(SCHEDULE_TASK_WITH_SPLITS.name())) {
+                assertNotNull(event.getTaskId());
+                scheduledTaskWithSplits = true;
+            }
+        }
+        assertTrue(stageChangeToPlanned);
+        assertTrue(stageChangeToAborted);
+        assertTrue(scheduledTaskWithSplits);
     }
 
     private static PlanFragment createExchangePlanFragment()
