@@ -125,6 +125,7 @@ public final class SystemSessionProperties
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_ROW_COUNT = "dynamic_filtering_max_per_driver_row_count";
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_SIZE = "dynamic_filtering_max_per_driver_size";
     public static final String IGNORE_DOWNSTREAM_PREFERENCES = "ignore_downstream_preferences";
+    public static final String QUERY_DEBUGGING_TRACER_ENABLED = "query_debugging_tracer_enabled";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
@@ -552,6 +553,11 @@ public final class SystemSessionProperties
                         IGNORE_DOWNSTREAM_PREFERENCES,
                         "Ignore Parent's PreferredProperties in AddExchange optimizer",
                         featuresConfig.isIgnoreDownstreamPreferences(),
+                        false),
+                booleanProperty(
+                        QUERY_DEBUGGING_TRACER_ENABLED,
+                        "Use query debugging tracer",
+                        featuresConfig.isQueryDebuggingTracerEnabled(),
                         false));
     }
 
@@ -1007,5 +1013,10 @@ public final class SystemSessionProperties
                 hidden,
                 value -> Duration.valueOf((String) value),
                 Duration::toString);
+    }
+
+    public static boolean isQueryDebuggingTracerEnabled(Session session)
+    {
+        return session.getSystemProperty(QUERY_DEBUGGING_TRACER_ENABLED, Boolean.class);
     }
 }
