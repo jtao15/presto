@@ -47,6 +47,7 @@ import io.prestosql.spi.connector.classloader.ClassLoaderSafeConnectorPageSource
 import io.prestosql.spi.connector.classloader.ClassLoaderSafeConnectorSplitManager;
 import io.prestosql.spi.connector.classloader.ClassLoaderSafeNodePartitioningProvider;
 import io.prestosql.spi.procedure.Procedure;
+import io.prestosql.spi.tracer.ConnectorTracerFactory;
 import io.prestosql.spi.type.TypeManager;
 import org.weakref.jmx.guice.MBeanModule;
 
@@ -99,6 +100,7 @@ public final class InternalHiveConnectorFactory
             HiveMetadataFactory metadataFactory = injector.getInstance(HiveMetadataFactory.class);
             HiveTransactionManager transactionManager = injector.getInstance(HiveTransactionManager.class);
             ConnectorSplitManager splitManager = injector.getInstance(ConnectorSplitManager.class);
+            ConnectorTracerFactory tracerFactory = injector.getInstance(ConnectorTracerFactory.class);
             ConnectorPageSourceProvider connectorPageSource = injector.getInstance(ConnectorPageSourceProvider.class);
             ConnectorPageSinkProvider pageSinkProvider = injector.getInstance(ConnectorPageSinkProvider.class);
             ConnectorNodePartitioningProvider connectorDistributionProvider = injector.getInstance(ConnectorNodePartitioningProvider.class);
@@ -118,6 +120,7 @@ public final class InternalHiveConnectorFactory
                     new ClassLoaderSafeConnectorPageSourceProvider(connectorPageSource, classLoader),
                     new ClassLoaderSafeConnectorPageSinkProvider(pageSinkProvider, classLoader),
                     new ClassLoaderSafeNodePartitioningProvider(connectorDistributionProvider, classLoader),
+                    tracerFactory,
                     ImmutableSet.of(),
                     procedures,
                     hiveSessionProperties.getSessionProperties(),
