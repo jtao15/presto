@@ -22,6 +22,9 @@ import io.prestosql.execution.scheduler.SplitSchedulerStats;
 import io.prestosql.failuredetector.NoOpFailureDetector;
 import io.prestosql.metadata.InternalNode;
 import io.prestosql.spi.QueryId;
+import io.prestosql.spi.eventlistener.TracerEvent;
+import io.prestosql.spi.tracer.DefaultTracer;
+import io.prestosql.spi.tracer.Tracer;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
@@ -37,6 +40,9 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.Test;
 
 import java.net.URI;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CountDownLatch;
@@ -99,6 +105,8 @@ public class TestSqlStageExecution
         NodeTaskMap nodeTaskMap = new NodeTaskMap(new FinalizerService());
 
         StageId stageId = new StageId(new QueryId("query"), 0);
+        List<TracerEvent> tracerEvents = Collections.synchronizedList(new ArrayList<>());
+        Tracer tracer = DefaultTracer.createBasicTracer(event -> tracerEvents.add(event), "node", new URI("http://test.com"), stageId.getQueryId().getId(), true).newTracerWithStageId(String.valueOf(stageId.getId()));
         SqlStageExecution stage = createSqlStageExecution(
                 stageId,
                 createExchangePlanFragment(),
@@ -109,7 +117,8 @@ public class TestSqlStageExecution
                 nodeTaskMap,
                 executor,
                 new NoOpFailureDetector(),
-                new SplitSchedulerStats());
+                new SplitSchedulerStats(),
+                tracer);
         stage.setOutputBuffers(createInitialEmptyOutputBuffers(ARBITRARY));
 
         // add listener that fetches stage info when the final status is available
