@@ -14,6 +14,8 @@
 package io.prestosql.plugin.hive.util;
 
 import com.google.common.collect.AbstractIterator;
+import com.google.common.collect.ImmutableMap;
+import io.airlift.json.JsonCodec;
 import io.airlift.stats.TimeStat;
 import io.prestosql.plugin.hive.DirectoryLister;
 import io.prestosql.plugin.hive.NamenodeStats;
@@ -31,9 +33,12 @@ import java.util.ArrayDeque;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.Iterator;
+import java.util.Map;
 
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_FILESYSTEM_ERROR;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_FILE_NOT_FOUND;
+import static io.prestosql.plugin.hive.tracer.HiveTracerEventType.LIST_FILE_STATES_END;
+import static io.prestosql.plugin.hive.tracer.HiveTracerEventType.LIST_FILE_STATES_START;
 import static java.util.Objects.requireNonNull;
 
 public class HiveFileIterator
@@ -53,6 +58,7 @@ public class HiveFileIterator
     private final NamenodeStats namenodeStats;
     private final NestedDirectoryPolicy nestedDirectoryPolicy;
     private final ConnectorOperationContext connectorOperationContext;
+    private final JsonCodec<Map<String, Object>> jsonCodec = JsonCodec.mapJsonCodec(String.class, Object.class);
 
     private Iterator<LocatedFileStatus> remoteIterator = Collections.emptyIterator();
 
@@ -105,7 +111,13 @@ public class HiveFileIterator
             if (paths.isEmpty()) {
                 return endOfData();
             }
-            remoteIterator = getLocatedFileStatusRemoteIterator(paths.removeFirst());
+
+            Path path = paths.removeFirst();
+            connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(LIST_FILE_STATES_START,
+                    () -> jsonCodec.toJson(ImmutableMap.of("path", path.toString()))));
+            remoteIterator = getLocatedFileStatusRemoteIterator(path);
+            connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(LIST_FILE_STATES_END,
+                    () -> jsonCodec.toJson(ImmutableMap.of("path", path.toString()))));
         }
     }
 

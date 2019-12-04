@@ -41,6 +41,7 @@ import static io.prestosql.orc.OrcTester.Format.ORC_12;
 import static io.prestosql.orc.OrcTester.createCustomOrcRecordReader;
 import static io.prestosql.orc.OrcTester.createOrcRecordWriter;
 import static io.prestosql.orc.OrcTester.createSettableStructObjectInspector;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static org.testng.Assert.assertEquals;
@@ -56,7 +57,7 @@ public class TestOrcReaderMemoryUsage
         int rows = 5000;
         OrcRecordReader reader = null;
         try (TempFile tempFile = createSingleColumnVarcharFile(rows, 10)) {
-            reader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, VARCHAR, INITIAL_BATCH_SIZE);
+            reader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, VARCHAR, INITIAL_BATCH_SIZE, createNoOpConnectorOperationContext());
             assertInitialRetainedSizes(reader, rows);
 
             long stripeReaderRetainedSize = reader.getCurrentStripeRetainedSizeInBytes();
@@ -101,7 +102,7 @@ public class TestOrcReaderMemoryUsage
         int rows = 10000;
         OrcRecordReader reader = null;
         try (TempFile tempFile = createSingleColumnFileWithNullValues(rows)) {
-            reader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, BIGINT, INITIAL_BATCH_SIZE);
+            reader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, BIGINT, INITIAL_BATCH_SIZE, createNoOpConnectorOperationContext());
             assertInitialRetainedSizes(reader, rows);
 
             long stripeReaderRetainedSize = reader.getCurrentStripeRetainedSizeInBytes();
@@ -148,7 +149,7 @@ public class TestOrcReaderMemoryUsage
         int rows = 10000;
         OrcRecordReader reader = null;
         try (TempFile tempFile = createSingleColumnMapFileWithNullValues(mapType, rows)) {
-            reader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, mapType, INITIAL_BATCH_SIZE);
+            reader = createCustomOrcRecordReader(tempFile, OrcPredicate.TRUE, mapType, INITIAL_BATCH_SIZE, createNoOpConnectorOperationContext());
             assertInitialRetainedSizes(reader, rows);
 
             long stripeReaderRetainedSize = reader.getCurrentStripeRetainedSizeInBytes();

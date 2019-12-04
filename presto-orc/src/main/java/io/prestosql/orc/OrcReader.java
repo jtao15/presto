@@ -15,6 +15,8 @@ package io.prestosql.orc;
 
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
+import io.airlift.json.JsonCodec;
 import io.airlift.log.Logger;
 import io.airlift.slice.Slice;
 import io.airlift.units.DataSize;
@@ -40,6 +42,7 @@ import org.joda.time.DateTimeZone;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -50,6 +53,10 @@ import static com.google.common.collect.ImmutableList.toImmutableList;
 import static io.airlift.slice.SizeOf.SIZE_OF_BYTE;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.OrcDecompressor.createOrcDecompressor;
+import static io.prestosql.orc.OrcTracerEventType.READ_ORC_COMPLETE_FOOTER_END;
+import static io.prestosql.orc.OrcTracerEventType.READ_ORC_COMPLETE_FOOTER_START;
+import static io.prestosql.orc.OrcTracerEventType.READ_ORC_TAIL_END;
+import static io.prestosql.orc.OrcTracerEventType.READ_ORC_TAIL_START;
 import static io.prestosql.orc.metadata.OrcColumnId.ROOT_COLUMN;
 import static io.prestosql.orc.metadata.PostScript.MAGIC;
 import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
@@ -80,6 +87,7 @@ public class OrcReader
     private final Metadata metadata;
     private final OrcColumn rootColumn;
     private final ConnectorOperationContext connectorOperationContext;
+    private final JsonCodec<Map<String, Object>> jsonCodec = JsonCodec.mapJsonCodec(String.class, Object.class);
 
     private final Optional<OrcWriteValidation> writeValidation;
 
@@ -120,7 +128,10 @@ public class OrcReader
 
         // Read the tail of the file
         int expectedBufferSize = toIntExact(min(size, EXPECTED_FOOTER_SIZE));
+        connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(READ_ORC_TAIL_START, null));
         Slice buffer = orcDataSource.readFully(size - expectedBufferSize, expectedBufferSize);
+        connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(READ_ORC_TAIL_END,
+                () -> buffer == null ? null : jsonCodec.toJson(ImmutableMap.of("orc tail", buffer.toString()))));
 
         // get length of PostScript - last byte of the file
         int postScriptSize = buffer.getUnsignedByte(buffer.length() - SIZE_OF_BYTE);
@@ -162,7 +173,10 @@ public class OrcReader
         int completeFooterSize = footerSize + metadataSize + postScriptSize + SIZE_OF_BYTE;
         if (completeFooterSize > buffer.length()) {
             // initial read was not large enough, so just read again with the correct size
+            connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(READ_ORC_COMPLETE_FOOTER_START, null));
             completeFooterSlice = orcDataSource.readFully(size - completeFooterSize, completeFooterSize);
+            connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(READ_ORC_COMPLETE_FOOTER_END,
+                    () -> completeFooterSlice == null ? null : jsonCodec.toJson(ImmutableMap.of("orc footer", completeFooterSlice.toString()))));
         }
         else {
             // footer is already in the bytes in buffer, just adjust position, length

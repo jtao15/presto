@@ -16,11 +16,13 @@ package io.prestosql.plugin.hive;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterators;
 import com.google.common.collect.ListMultimap;
 import com.google.common.collect.Streams;
 import com.google.common.io.CharStreams;
 import com.google.common.util.concurrent.ListenableFuture;
+import io.airlift.json.JsonCodec;
 import io.prestosql.plugin.hive.HdfsEnvironment.HdfsContext;
 import io.prestosql.plugin.hive.HiveSplit.BucketConversion;
 import io.prestosql.plugin.hive.metastore.Column;
@@ -63,6 +65,7 @@ import java.util.Arrays;
 import java.util.Deque;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.Properties;
@@ -88,6 +91,12 @@ import static io.prestosql.plugin.hive.HiveSessionProperties.isForceLocalSchedul
 import static io.prestosql.plugin.hive.metastore.MetastoreUtil.getHiveSchema;
 import static io.prestosql.plugin.hive.metastore.MetastoreUtil.getPartitionLocation;
 import static io.prestosql.plugin.hive.s3select.S3SelectPushdown.shouldEnablePushdownForTable;
+import static io.prestosql.plugin.hive.tracer.HiveTracerEventType.LIST_FILE_STATES_END;
+import static io.prestosql.plugin.hive.tracer.HiveTracerEventType.LIST_FILE_STATES_START;
+import static io.prestosql.plugin.hive.tracer.HiveTracerEventType.LIST_SYMLINK_TEXT_INPUT_FILE_STATES_END;
+import static io.prestosql.plugin.hive.tracer.HiveTracerEventType.LIST_SYMLINK_TEXT_INPUT_FILE_STATES_START;
+import static io.prestosql.plugin.hive.tracer.HiveTracerEventType.LOAD_SPLIT_END;
+import static io.prestosql.plugin.hive.tracer.HiveTracerEventType.LOAD_SPLIT_START;
 import static io.prestosql.plugin.hive.util.ConfigurationUtils.toJobConf;
 import static io.prestosql.plugin.hive.util.HiveFileIterator.NestedDirectoryPolicy.FAIL;
 import static io.prestosql.plugin.hive.util.HiveFileIterator.NestedDirectoryPolicy.IGNORED;
@@ -129,6 +138,7 @@ public class BackgroundHiveSplitLoader
     private final Deque<Iterator<InternalHiveSplit>> fileIterators = new ConcurrentLinkedDeque<>();
     private final Optional<ValidWriteIdList> validWriteIds;
     private final ConnectorOperationContext connectorOperationContext;
+    private final JsonCodec<Map<String, Object>> jsonCodec = JsonCodec.mapJsonCodec(String.class, Object.class);
 
     // Purpose of this lock:
     // * Write lock: when you need a consistent view across partitions, fileIterators, and hiveSplitSource.
@@ -334,7 +344,12 @@ public class BackgroundHiveSplitLoader
                 targetJob.setInputFormat(TextInputFormat.class);
                 targetInputFormat.configure(targetJob);
                 FileInputFormat.setInputPaths(targetJob, targetPath);
+
+                connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(LIST_SYMLINK_TEXT_INPUT_FILE_STATES_START,
+                        () -> targetPath == null ? null : jsonCodec.toJson((new ImmutableMap.Builder<String, Object>()).put("path", targetPath.toString()).build())));
                 InputSplit[] targetSplits = targetInputFormat.getSplits(targetJob, 0);
+                connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(LIST_SYMLINK_TEXT_INPUT_FILE_STATES_END,
+                        () -> targetPath == null ? null : jsonCodec.toJson((new ImmutableMap.Builder<String, Object>()).put("path", targetPath.toString()).build())));
 
                 InternalHiveSplitFactory splitFactory = new InternalHiveSplitFactory(
                         targetFilesystem,
@@ -398,7 +413,23 @@ public class BackgroundHiveSplitLoader
 
             JobConf jobConf = toJobConf(configuration);
             FileInputFormat.setInputPaths(jobConf, path);
+            connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(LIST_FILE_STATES_START,
+                    () -> jsonCodec.toJson(new ImmutableMap.Builder<String, Object>().put("path", path.toString()).put("format", inputFormat.toString()).build())));
             InputSplit[] splits = inputFormat.getSplits(jobConf, 0);
+            connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(LIST_FILE_STATES_END,
+                    () -> {
+                        ImmutableMap.Builder<String, Object> mapBuilder = new ImmutableMap.Builder<>();
+                        mapBuilder.put("path", path.toString());
+                        mapBuilder.put("format", inputFormat.toString());
+                        if (splits != null) {
+                            String[] splitInfos = new String[splits.length];
+                            for (int i = 0; i < splits.length; i++) {
+                                splitInfos[i] = splits[i].toString();
+                            }
+                            mapBuilder.put("splits", splitInfos);
+                        }
+                        return jsonCodec.toJson(mapBuilder.build());
+                    }));
 
             return addSplitsToSource(splits, splitFactory);
         }
@@ -457,7 +488,20 @@ public class BackgroundHiveSplitLoader
     {
         ListenableFuture<?> lastResult = COMPLETED_FUTURE;
         for (InputSplit inputSplit : targetSplits) {
+            connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(LOAD_SPLIT_START,
+                    () -> jsonCodec.toJson((new ImmutableMap.Builder<String, Object>())
+                            .put("path", ((FileSplit) inputSplit).getPath().toString())
+                            .put("start", ((FileSplit) inputSplit).getStart())
+                            .put("length", ((FileSplit) inputSplit).getLength())
+                            .build())));
             Optional<InternalHiveSplit> internalHiveSplit = splitFactory.createInternalHiveSplit((FileSplit) inputSplit);
+            connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(LOAD_SPLIT_END,
+                    () -> jsonCodec.toJson((new ImmutableMap.Builder<String, Object>())
+                            .put("path", ((FileSplit) inputSplit).getPath().toString())
+                            .put("start", ((FileSplit) inputSplit).getStart())
+                            .put("length", ((FileSplit) inputSplit).getLength())
+                            .build())));
+
             if (internalHiveSplit.isPresent()) {
                 lastResult = hiveSplitSource.addToQueue(internalHiveSplit.get());
             }

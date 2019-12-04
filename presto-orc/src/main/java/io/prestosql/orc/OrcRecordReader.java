@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.io.Closer;
+import io.airlift.json.JsonCodec;
 import io.airlift.slice.Slice;
 import io.airlift.slice.Slices;
 import io.airlift.units.DataSize;
@@ -61,6 +62,8 @@ import static io.prestosql.orc.OrcDataSourceUtils.mergeAdjacentDiskRanges;
 import static io.prestosql.orc.OrcReader.BATCH_SIZE_GROWTH_FACTOR;
 import static io.prestosql.orc.OrcReader.MAX_BATCH_SIZE;
 import static io.prestosql.orc.OrcRecordReader.LinearProbeRangeFinder.createTinyStripesRangeFinder;
+import static io.prestosql.orc.OrcTracerEventType.READ_STRIPE_END;
+import static io.prestosql.orc.OrcTracerEventType.READ_STRIPE_START;
 import static io.prestosql.orc.OrcWriteValidation.WriteChecksumBuilder.createWriteChecksumBuilder;
 import static io.prestosql.orc.reader.ColumnReaders.createColumnReader;
 import static io.prestosql.spi.block.LazyBlock.listenForLoads;
@@ -118,6 +121,7 @@ public class OrcRecordReader
     private final Optional<StatisticsValidation> fileStatisticsValidation;
 
     private final ConnectorOperationContext connectorOperationContext;
+    private final JsonCodec<Map<String, Object>> jsonCodec = JsonCodec.mapJsonCodec(String.class, Object.class);
 
     public OrcRecordReader(
             List<OrcColumn> readColumns,
@@ -506,7 +510,12 @@ public class OrcRecordReader
         StripeInformation stripeInformation = stripes.get(currentStripe);
         validateWriteStripe(stripeInformation.getNumberOfRows());
 
+        connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(READ_STRIPE_START,
+                () -> stripeInformation == null ? null : jsonCodec.toJson(ImmutableMap.of("stripe", stripeInformation.toString()))));
         Stripe stripe = stripeReader.readStripe(stripeInformation, currentStripeSystemMemoryContext);
+        connectorOperationContext.getConnectorTracer().ifPresent(tracer -> tracer.emitEvent(READ_STRIPE_END,
+                () -> stripeInformation == null ? null : jsonCodec.toJson(ImmutableMap.of("stripe", stripeInformation.toString()))));
+
         if (stripe != null) {
             // Give readers access to dictionary streams
             InputStreamSources dictionaryStreamSources = stripe.getDictionaryStreamSources();
