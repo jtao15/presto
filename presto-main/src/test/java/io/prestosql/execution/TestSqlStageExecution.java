@@ -16,6 +16,7 @@ package io.prestosql.execution;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.SettableFuture;
+import io.airlift.json.JsonCodec;
 import io.prestosql.client.NodeVersion;
 import io.prestosql.cost.StatsAndCosts;
 import io.prestosql.execution.scheduler.SplitSchedulerStats;
@@ -25,6 +26,7 @@ import io.prestosql.spi.QueryId;
 import io.prestosql.spi.eventlistener.TracerEvent;
 import io.prestosql.spi.tracer.DefaultTracer;
 import io.prestosql.spi.tracer.Tracer;
+import io.prestosql.spi.tracer.TracerEventType;
 import io.prestosql.spi.type.Type;
 import io.prestosql.sql.planner.Partitioning;
 import io.prestosql.sql.planner.PartitioningScheme;
@@ -43,12 +45,14 @@ import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.OptionalInt;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.stream.Collectors;
 
 import static io.airlift.concurrent.Threads.daemonThreadsNamed;
 import static io.prestosql.SessionTestUtils.TEST_SESSION;
@@ -56,6 +60,9 @@ import static io.prestosql.execution.SqlStageExecution.createSqlStageExecution;
 import static io.prestosql.execution.buffer.OutputBuffers.BufferType.ARBITRARY;
 import static io.prestosql.execution.buffer.OutputBuffers.createInitialEmptyOutputBuffers;
 import static io.prestosql.operator.StageExecutionDescriptor.ungroupedExecution;
+import static io.prestosql.spi.tracer.TracerEventType.SCHEDULE_TASK_WITH_SPLITS;
+import static io.prestosql.spi.tracer.TracerEventType.STAGE_STATE_CHANGE_ABORTED;
+import static io.prestosql.spi.tracer.TracerEventType.STAGE_STATE_CHANGE_PLANNED;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SINGLE_DISTRIBUTION;
 import static io.prestosql.sql.planner.SystemPartitioningHandle.SOURCE_DISTRIBUTION;
@@ -71,6 +78,7 @@ public class TestSqlStageExecution
 {
     private ExecutorService executor;
     private ScheduledExecutorService scheduledExecutor;
+    private final JsonCodec<Map<String, Object>> jsonCodec = JsonCodec.mapJsonCodec(String.class, Object.class);
 
     @BeforeClass
     public void setUp()
@@ -106,7 +114,7 @@ public class TestSqlStageExecution
 
         StageId stageId = new StageId(new QueryId("query"), 0);
         List<TracerEvent> tracerEvents = Collections.synchronizedList(new ArrayList<>());
-        Tracer tracer = DefaultTracer.createBasicTracer(event -> tracerEvents.add(event), "node", new URI("http://test.com"), stageId.getQueryId().getId(), true).newTracerWithStageId(String.valueOf(stageId.getId()));
+        Tracer tracer = DefaultTracer.createBasicTracer(event -> tracerEvents.add(event), payloadMap -> jsonCodec.toJson(payloadMap), "node", URI.create("http://test.com"), stageId.getQueryId().getId(), true).newTracerWithStageId(String.valueOf(stageId.getId()));
         SqlStageExecution stage = createSqlStageExecution(
                 stageId,
                 createExchangePlanFragment(),
@@ -162,6 +170,14 @@ public class TestSqlStageExecution
 
         // cancel the background thread adding tasks
         addTasksTask.cancel(true);
+
+        // check tracer events
+        assertTrue(tracerEvents.size() > 2);
+        List<String> eventTypes = tracerEvents.stream().map(TracerEvent::getEventType).collect(Collectors.toList());
+        assertTrue(ImmutableList.of(STAGE_STATE_CHANGE_PLANNED, STAGE_STATE_CHANGE_ABORTED, SCHEDULE_TASK_WITH_SPLITS)
+                .stream()
+                .map(TracerEventType::toTracerEventType)
+                .allMatch(eventTypes::contains));
     }
 
     private static PlanFragment createExchangePlanFragment()
