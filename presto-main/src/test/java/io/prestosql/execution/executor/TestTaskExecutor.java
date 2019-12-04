@@ -21,22 +21,35 @@ import io.airlift.testing.TestingTicker;
 import io.airlift.units.Duration;
 import io.prestosql.execution.SplitRunner;
 import io.prestosql.execution.TaskId;
+import io.prestosql.spi.eventlistener.TracerEvent;
+import io.prestosql.spi.tracer.DefaultTracer;
 import io.prestosql.spi.tracer.Tracer;
+import io.prestosql.spi.tracer.TracerEventType;
 import org.testng.annotations.Test;
 
+import java.net.URI;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 import java.util.OptionalInt;
+import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.Phaser;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.stream.Collectors;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static io.airlift.testing.Assertions.assertGreaterThan;
 import static io.airlift.testing.Assertions.assertLessThan;
 import static io.prestosql.execution.executor.MultilevelSplitQueue.LEVEL_CONTRIBUTION_CAP;
 import static io.prestosql.execution.executor.MultilevelSplitQueue.LEVEL_THRESHOLD_SECONDS;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_DESTROY_INVOKED;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_DRIVER_CREATED;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_FINISHED;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_SCHEDULED;
+import static io.prestosql.spi.tracer.TracerEventType.SPLIT_STARTS_WAITING;
 import static io.prestosql.tracer.NoOpTracerFactory.createNoOpTracer;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static java.util.concurrent.TimeUnit.MINUTES;
@@ -66,7 +79,9 @@ public class TestTaskExecutor
             verificationComplete.register();
 
             // add two jobs
-            TestingJob driver1 = new TestingJob(ticker, new Phaser(), beginPhase, verificationComplete, 10, 0);
+            List<TracerEvent> tracerEvents = Collections.synchronizedList(new ArrayList<>());
+            Tracer tracer = DefaultTracer.createBasicTracer(event -> tracerEvents.add(event), "node", URI.create("http://test.com"), "driver1", true);
+            TestingJob driver1 = new TestingJob(ticker, new Phaser(), beginPhase, verificationComplete, 10, 0, tracer);
             ListenableFuture<?> future1 = getOnlyElement(taskExecutor.enqueueSplits(taskHandle, true, ImmutableList.of(driver1)));
             TestingJob driver2 = new TestingJob(ticker, new Phaser(), beginPhase, verificationComplete, 10, 0);
             ListenableFuture<?> future2 = getOnlyElement(taskExecutor.enqueueSplits(taskHandle, true, ImmutableList.of(driver2)));
@@ -136,6 +151,13 @@ public class TestTaskExecutor
             // no splits remaining
             ticker.increment(610, SECONDS);
             assertEquals(taskExecutor.getRunAwaySplitCount(), 0);
+
+            future1.addListener(() -> {
+                List<TracerEventType> actionsOccursOnlyOnce = ImmutableList.of(SPLIT_DRIVER_CREATED, SPLIT_FINISHED, SPLIT_DESTROY_INVOKED);
+                List<TracerEventType> actionsOccursAtLeastOnce = ImmutableList.of(SPLIT_SCHEDULED, SPLIT_STARTS_WAITING);
+                checkTracerEventsOccursOnlyOnce(tracerEvents, actionsOccursOnlyOnce);
+                checkTracerEventsOccursAtLeastOnce(tracerEvents, actionsOccursAtLeastOnce); },
+                    Executors.newSingleThreadExecutor());
         }
         finally {
             taskExecutor.stop();
@@ -445,6 +467,18 @@ public class TestTaskExecutor
         }
     }
 
+    private void checkTracerEventsOccursOnlyOnce(List<TracerEvent> tracerEvents, List<TracerEventType> expectedEventTypes)
+    {
+        List<String> eventTypes = tracerEvents.stream().map(TracerEvent::getEventType).collect(Collectors.toList());
+        assertTrue(expectedEventTypes.stream().map(TracerEventType::toTracerEventType).filter(eventTypes::contains).count() == expectedEventTypes.size());
+    }
+
+    private void checkTracerEventsOccursAtLeastOnce(List<TracerEvent> tracerEvents, List<TracerEventType> expectedEventTypes)
+    {
+        List<String> eventTypes = tracerEvents.stream().map(TracerEvent::getEventType).collect(Collectors.toList());
+        assertTrue(expectedEventTypes.stream().map(TracerEventType::toTracerEventType).allMatch(eventTypes::contains));
+    }
+
     private void assertSplitStates(int endIndex, TestingJob[] splits)
     {
         // assert that splits up to and including endIndex are all started
@@ -488,6 +522,8 @@ public class TestTaskExecutor
         private final AtomicBoolean started = new AtomicBoolean();
         private final SettableFuture<?> completed = SettableFuture.create();
 
+        private Tracer tracer;
+
         public TestingJob(TestingTicker ticker, Phaser globalPhaser, Phaser beginQuantaPhaser, Phaser endQuantaPhaser, int requiredPhases, int quantaTimeMillis)
         {
             this.ticker = ticker;
@@ -503,6 +539,12 @@ public class TestTaskExecutor
             if (globalPhaser.getRegisteredParties() == 0) {
                 globalPhaser.register();
             }
+        }
+
+        public TestingJob(TestingTicker ticker, Phaser globalPhaser, Phaser beginQuantaPhaser, Phaser endQuantaPhaser, int requiredPhases, int quantaTimeMillis, Tracer tracer)
+        {
+            this(ticker, globalPhaser, beginQuantaPhaser, endQuantaPhaser, requiredPhases, quantaTimeMillis);
+            this.tracer = tracer;
         }
 
         private int getFirstPhase()
@@ -523,7 +565,7 @@ public class TestTaskExecutor
         @Override
         public Tracer getTracer()
         {
-            return createNoOpTracer();
+            return tracer == null ? createNoOpTracer() : tracer;
         }
 
         @Override

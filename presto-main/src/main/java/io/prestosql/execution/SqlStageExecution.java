@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multimap;
 import com.google.common.collect.Sets;
+import io.airlift.json.JsonCodec;
 import io.airlift.units.Duration;
 import io.prestosql.Session;
 import io.prestosql.execution.StateMachine.StateChangeListener;
@@ -41,6 +42,7 @@ import javax.annotation.concurrent.ThreadSafe;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,6 +68,8 @@ import static io.prestosql.failuredetector.FailureDetector.State.GONE;
 import static io.prestosql.operator.ExchangeOperator.REMOTE_CONNECTOR_ID;
 import static io.prestosql.spi.StandardErrorCode.GENERIC_INTERNAL_ERROR;
 import static io.prestosql.spi.StandardErrorCode.REMOTE_HOST_GONE;
+import static io.prestosql.spi.tracer.TracerEventType.ADD_SPLITS_TO_TASK;
+import static io.prestosql.spi.tracer.TracerEventType.SCHEDULE_TASK_WITH_SPLITS;
 import static java.util.Objects.requireNonNull;
 
 @ThreadSafe
@@ -105,6 +109,8 @@ public final class SqlStageExecution
     private final ListenerManager<Set<Lifespan>> completedLifespansChangeListeners = new ListenerManager<>();
 
     private final Tracer tracer;
+
+    private final JsonCodec<Map<String, Object>> jsonCodec = JsonCodec.mapJsonCodec(String.class, Object.class);
 
     public static SqlStageExecution createSqlStageExecution(
             StageId stageId,
@@ -158,6 +164,7 @@ public final class SqlStageExecution
         }
         this.exchangeSources = fragmentToExchangeSource.build();
         this.tracer = requireNonNull(tracer, "tracer is null");
+        this.stateMachine.addStateChangeListener((state) -> tracer.emitEvent(state.toTracerEventType(), null));
     }
 
     // this is a separate method to ensure that the `this` reference is not leaked during construction
@@ -399,8 +406,9 @@ public final class SqlStageExecution
         }
         else {
             task = tasks.iterator().next();
-            Tracer taskTracer = tracer.newTracerWithTaskId(String.valueOf(task.getTaskId().getId()));
             task.addSplits(splits);
+            Tracer taskTracer = tracer.newTracerWithTaskId(String.valueOf(task.getTaskId().getId()));
+            taskTracer.emitEvent(ADD_SPLITS_TO_TASK, () -> jsonCodec.toJson(ImmutableMap.of("splits", splits)));
         }
         if (noMoreSplitsNotification.size() > 1) {
             // The assumption that `noMoreSplitsNotification.size() <= 1` currently holds.
@@ -417,7 +425,6 @@ public final class SqlStageExecution
     private synchronized RemoteTask scheduleTask(InternalNode node, TaskId taskId, Multimap<PlanNodeId, Split> sourceSplits, OptionalInt totalPartitions)
     {
         checkArgument(!allTasks.contains(taskId), "A task with id %s already exists", taskId);
-        Tracer taskTracer = tracer.newTracerWithTaskId(String.valueOf(taskId.getId()));
 
         ImmutableMultimap.Builder<PlanNodeId, Split> initialSplits = ImmutableMultimap.builder();
         initialSplits.putAll(sourceSplits);
@@ -443,6 +450,12 @@ public final class SqlStageExecution
                 nodeTaskMap.createPartitionedSplitCountTracker(node, taskId),
                 summarizeTaskInfo,
                 tracer);
+        Tracer taskTracer = tracer.newTracerWithTaskId(String.valueOf(taskId.getId()));
+        taskTracer.emitEvent(SCHEDULE_TASK_WITH_SPLITS, () -> {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("splits", sourceSplits);
+            return jsonCodec.toJson(payload);
+        });
 
         completeSources.forEach(task::noMoreSplits);
 

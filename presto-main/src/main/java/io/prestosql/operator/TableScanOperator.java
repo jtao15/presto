@@ -16,6 +16,7 @@ package io.prestosql.operator;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.SettableFuture;
+import io.airlift.json.JsonCodec;
 import io.prestosql.Session;
 import io.prestosql.memory.context.LocalMemoryContext;
 import io.prestosql.memory.context.MemoryTrackingContext;
@@ -35,13 +36,16 @@ import io.prestosql.sql.planner.plan.PlanNodeId;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Supplier;
 
 import static com.google.common.base.Preconditions.checkState;
 import static io.airlift.concurrent.MoreFutures.toListenableFuture;
+import static io.prestosql.spi.tracer.TracerEventType.ADD_SPLIT_TO_OPERATOR;
 import static java.util.Objects.requireNonNull;
 
 public class TableScanOperator
@@ -150,6 +154,8 @@ public class TableScanOperator
     private long completedBytes;
     private long readTimeNanos;
 
+    private final JsonCodec<Map<String, Object>> jsonCodec = JsonCodec.mapJsonCodec(String.class, Object.class);
+
     public TableScanOperator(
             OperatorContext operatorContext,
             PlanNodeId planNodeId,
@@ -188,6 +194,12 @@ public class TableScanOperator
         if (finished) {
             return Optional::empty;
         }
+
+        tracer.emitEvent(ADD_SPLIT_TO_OPERATOR, () -> {
+            Map<String, Object> payload = new HashMap<>();
+            payload.put("split", split);
+            return jsonCodec.toJson(payload);
+        });
 
         this.split = split;
 
