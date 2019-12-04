@@ -106,6 +106,7 @@ import static io.prestosql.plugin.hive.HiveColumnHandle.ColumnType.REGULAR;
 import static io.prestosql.plugin.hive.HiveTestUtils.HDFS_ENVIRONMENT;
 import static io.prestosql.plugin.hive.HiveTestUtils.SESSION;
 import static io.prestosql.plugin.hive.HiveTestUtils.TYPE_MANAGER;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.VarcharType.createUnboundedVarcharType;
 import static io.prestosql.sql.relational.Expressions.field;
 import static io.prestosql.testing.TestingHandles.TEST_TABLE_HANDLE;
@@ -495,7 +496,8 @@ public class TestOrcPageSourceMemoryTracking
                     TYPE_MANAGER,
                     ImmutableMap.of(),
                     Optional.empty(),
-                    false)
+                    false,
+                    createNoOpConnectorOperationContext())
                     .get();
         }
 

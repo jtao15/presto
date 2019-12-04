@@ -19,6 +19,7 @@ import io.prestosql.plugin.hive.DirectoryLister;
 import io.prestosql.plugin.hive.NamenodeStats;
 import io.prestosql.plugin.hive.metastore.Table;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ConnectorOperationContext;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.LocatedFileStatus;
 import org.apache.hadoop.fs.Path;
@@ -51,6 +52,7 @@ public class HiveFileIterator
     private final DirectoryLister directoryLister;
     private final NamenodeStats namenodeStats;
     private final NestedDirectoryPolicy nestedDirectoryPolicy;
+    private final ConnectorOperationContext connectorOperationContext;
 
     private Iterator<LocatedFileStatus> remoteIterator = Collections.emptyIterator();
 
@@ -60,7 +62,8 @@ public class HiveFileIterator
             FileSystem fileSystem,
             DirectoryLister directoryLister,
             NamenodeStats namenodeStats,
-            NestedDirectoryPolicy nestedDirectoryPolicy)
+            NestedDirectoryPolicy nestedDirectoryPolicy,
+            ConnectorOperationContext connectorOperationContext)
     {
         paths.addLast(requireNonNull(path, "path is null"));
         this.table = requireNonNull(table, "table is null");
@@ -68,6 +71,7 @@ public class HiveFileIterator
         this.directoryLister = requireNonNull(directoryLister, "directoryLister is null");
         this.namenodeStats = requireNonNull(namenodeStats, "namenodeStats is null");
         this.nestedDirectoryPolicy = requireNonNull(nestedDirectoryPolicy, "nestedDirectoryPolicy is null");
+        this.connectorOperationContext = requireNonNull(connectorOperationContext, "connectorOperationContext is null");
     }
 
     @Override

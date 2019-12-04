@@ -26,6 +26,7 @@ import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.OrcReader.INITIAL_BATCH_SIZE;
 import static io.prestosql.orc.metadata.CompressionKind.LZ4;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
 import static java.lang.Math.toIntExact;
@@ -43,7 +44,7 @@ public class TestOrcLz4
         // TODO: use Apache ORC library in OrcTester
         byte[] data = toByteArray(getResource("apache-lz4.orc"));
 
-        OrcReader orcReader = new OrcReader(new InMemoryOrcDataSource(data), new OrcReaderOptions());
+        OrcReader orcReader = new OrcReader(new InMemoryOrcDataSource(data), new OrcReaderOptions(), createNoOpConnectorOperationContext());
 
         assertEquals(orcReader.getCompressionKind(), LZ4);
         assertEquals(orcReader.getFooter().getNumberOfRows(), 10_000);

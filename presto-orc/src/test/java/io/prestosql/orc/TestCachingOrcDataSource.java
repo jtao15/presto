@@ -57,6 +57,7 @@ import static io.prestosql.orc.OrcTester.READER_OPTIONS;
 import static io.prestosql.orc.OrcTester.writeOrcFileColumnHive;
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
 import static io.prestosql.orc.metadata.CompressionKind.ZLIB;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.String.format;
 import static org.apache.hadoop.hive.serde2.objectinspector.primitive.PrimitiveObjectInspectorFactory.javaStringObjectInspector;
@@ -199,7 +200,7 @@ public class TestCachingOrcDataSource
                 .withMaxMergeDistance(maxMergeDistance)
                 .withTinyStripeThreshold(tinyStripeThreshold)
                 .withMaxReadBlockSize(new DataSize(1, Unit.MEGABYTE));
-        OrcReader orcReader = new OrcReader(orcDataSource, options);
+        OrcReader orcReader = new OrcReader(orcDataSource, options, createNoOpConnectorOperationContext());
         // 1 for reading file footer
         assertEquals(orcDataSource.getReadCount(), 1);
         List<StripeInformation> stripes = orcReader.getFooter().getStripes();

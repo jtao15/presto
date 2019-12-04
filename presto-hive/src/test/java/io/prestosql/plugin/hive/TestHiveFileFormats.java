@@ -80,6 +80,7 @@ import static io.prestosql.plugin.hive.HiveTestUtils.TYPE_MANAGER;
 import static io.prestosql.plugin.hive.HiveTestUtils.createGenericHiveRecordCursorProvider;
 import static io.prestosql.plugin.hive.HiveTestUtils.getHiveSession;
 import static io.prestosql.plugin.hive.HiveTestUtils.getTypes;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static java.util.Objects.requireNonNull;
 import static java.util.stream.Collectors.toList;
 import static org.apache.hadoop.hive.metastore.api.hive_metastoreConstants.FILE_INPUT_FORMAT;
@@ -577,7 +578,8 @@ public class TestHiveFileFormats
                 TYPE_MANAGER,
                 ImmutableMap.of(),
                 Optional.empty(),
-                false);
+                false,
+                createNoOpConnectorOperationContext());
 
         RecordCursor cursor = ((RecordPageSource) pageSource.get()).getCursor();
 
@@ -635,7 +637,8 @@ public class TestHiveFileFormats
                 TYPE_MANAGER,
                 ImmutableMap.of(),
                 Optional.empty(),
-                false);
+                false,
+                createNoOpConnectorOperationContext());
 
         assertTrue(pageSource.isPresent());
 

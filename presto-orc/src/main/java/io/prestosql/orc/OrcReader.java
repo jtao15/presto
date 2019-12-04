@@ -33,6 +33,7 @@ import io.prestosql.orc.metadata.PostScript.HiveWriterVersion;
 import io.prestosql.orc.stream.OrcChunkLoader;
 import io.prestosql.orc.stream.OrcInputStream;
 import io.prestosql.spi.Page;
+import io.prestosql.spi.connector.ConnectorOperationContext;
 import io.prestosql.spi.type.Type;
 import org.joda.time.DateTimeZone;
 
@@ -51,6 +52,7 @@ import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggre
 import static io.prestosql.orc.OrcDecompressor.createOrcDecompressor;
 import static io.prestosql.orc.metadata.OrcColumnId.ROOT_COLUMN;
 import static io.prestosql.orc.metadata.PostScript.MAGIC;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static java.lang.Math.min;
 import static java.lang.Math.toIntExact;
 import static java.util.Objects.requireNonNull;
@@ -77,19 +79,21 @@ public class OrcReader
     private final Footer footer;
     private final Metadata metadata;
     private final OrcColumn rootColumn;
+    private final ConnectorOperationContext connectorOperationContext;
 
     private final Optional<OrcWriteValidation> writeValidation;
 
-    public OrcReader(OrcDataSource orcDataSource, OrcReaderOptions options)
+    public OrcReader(OrcDataSource orcDataSource, OrcReaderOptions options, ConnectorOperationContext connectorOperationContext)
             throws IOException
     {
-        this(orcDataSource, options, Optional.empty());
+        this(orcDataSource, options, Optional.empty(), connectorOperationContext);
     }
 
     private OrcReader(
             OrcDataSource orcDataSource,
             OrcReaderOptions options,
-            Optional<OrcWriteValidation> writeValidation)
+            Optional<OrcWriteValidation> writeValidation,
+            ConnectorOperationContext connectorOperationContext)
             throws IOException
     {
         this.options = requireNonNull(options, "options is null");
@@ -98,6 +102,7 @@ public class OrcReader
         this.metadataReader = new ExceptionWrappingMetadataReader(orcDataSource.getId(), new OrcMetadataReader());
 
         this.writeValidation = requireNonNull(writeValidation, "writeValidation is null");
+        this.connectorOperationContext = requireNonNull(connectorOperationContext, "connectorOperationContext is null");
 
         //
         // Read the file tail:
@@ -276,7 +281,8 @@ public class OrcReader
                 systemMemoryUsage,
                 writeValidation,
                 initialBatchSize,
-                exceptionTransform);
+                exceptionTransform,
+                connectorOperationContext);
     }
 
     private static OrcDataSource wrapWithCacheIfTiny(OrcDataSource dataSource, DataSize maxCacheSize)
@@ -373,7 +379,7 @@ public class OrcReader
             throws OrcCorruptionException
     {
         try {
-            OrcReader orcReader = new OrcReader(input, new OrcReaderOptions(), Optional.of(writeValidation));
+            OrcReader orcReader = new OrcReader(input, new OrcReaderOptions(), Optional.of(writeValidation), createNoOpConnectorOperationContext());
             try (OrcRecordReader orcRecordReader = orcReader.createRecordReader(
                     orcReader.getRootColumn().getNestedColumns(),
                     readTypes,

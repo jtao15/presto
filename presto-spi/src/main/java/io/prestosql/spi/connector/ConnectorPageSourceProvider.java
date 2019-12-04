@@ -21,20 +21,7 @@ public interface ConnectorPageSourceProvider
 {
     /**
      * @param columns columns that should show up in the output page, in this order
-     */
-    default ConnectorPageSource createPageSource(
-            ConnectorTransactionHandle transaction,
-            ConnectorSession session,
-            ConnectorSplit split,
-            ConnectorTableHandle table,
-            List<ColumnHandle> columns)
-    {
-        throw new UnsupportedOperationException("createPageSource() must be implemented");
-    }
-
-    /**
-     * @param columns columns that should show up in the output page, in this order
-     * @param dynamicFilter optionally remove rows that don't satisfy this predicate
+     * @param connectorOperationContext
      */
     default ConnectorPageSource createPageSource(
             ConnectorTransactionHandle transaction,
@@ -42,9 +29,26 @@ public interface ConnectorPageSourceProvider
             ConnectorSplit split,
             ConnectorTableHandle table,
             List<ColumnHandle> columns,
-            TupleDomain<ColumnHandle> dynamicFilter)
+            ConnectorOperationContext connectorOperationContext)
+    {
+        throw new UnsupportedOperationException("createPageSource() must be implemented");
+    }
+
+    /**
+     * @param columns columns that should show up in the output page, in this order
+     * @param dynamicFilter optionally remove rows that don't satisfy this predicate
+     * @param connectorOperationContext
+     */
+    default ConnectorPageSource createPageSource(
+            ConnectorTransactionHandle transaction,
+            ConnectorSession session,
+            ConnectorSplit split,
+            ConnectorTableHandle table,
+            List<ColumnHandle> columns,
+            TupleDomain<ColumnHandle> dynamicFilter,
+            ConnectorOperationContext connectorOperationContext)
     {
         // By default, ignore dynamic filter (as it is an optimization and doesn't affect correctness).
-        return createPageSource(transaction, session, split, table, columns);
+        return createPageSource(transaction, session, split, table, columns, connectorOperationContext);
     }
 }

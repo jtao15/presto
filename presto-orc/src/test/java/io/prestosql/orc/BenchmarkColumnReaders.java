@@ -57,6 +57,7 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.orc.OrcReader.INITIAL_BATCH_SIZE;
 import static io.prestosql.orc.OrcTester.writeOrcColumnPresto;
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.BooleanType.BOOLEAN;
 import static io.prestosql.spi.type.DecimalType.createDecimalType;
@@ -364,7 +365,7 @@ public class BenchmarkColumnReaders
         OrcRecordReader createRecordReader()
                 throws IOException
         {
-            OrcReader orcReader = new OrcReader(dataSource, new OrcReaderOptions());
+            OrcReader orcReader = new OrcReader(dataSource, new OrcReaderOptions(), createNoOpConnectorOperationContext());
             return orcReader.createRecordReader(
                     orcReader.getRootColumn().getNestedColumns(),
                     ImmutableList.of(type),

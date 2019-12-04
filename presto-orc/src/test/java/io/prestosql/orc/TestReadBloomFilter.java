@@ -38,6 +38,7 @@ import static io.prestosql.orc.OrcTester.HIVE_STORAGE_TIME_ZONE;
 import static io.prestosql.orc.OrcTester.READER_OPTIONS;
 import static io.prestosql.orc.OrcTester.writeOrcColumnHive;
 import static io.prestosql.orc.metadata.CompressionKind.LZ4;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.DateType.DATE;
 import static io.prestosql.spi.type.DoubleType.DOUBLE;
@@ -130,7 +131,7 @@ public class TestReadBloomFilter
             throws IOException
     {
         OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), READER_OPTIONS);
-        OrcReader orcReader = new OrcReader(orcDataSource, READER_OPTIONS);
+        OrcReader orcReader = new OrcReader(orcDataSource, READER_OPTIONS, createNoOpConnectorOperationContext());
 
         assertEquals(orcReader.getColumnNames(), ImmutableList.of("test"));
         assertEquals(orcReader.getFooter().getRowsInRowGroup(), 10_000);

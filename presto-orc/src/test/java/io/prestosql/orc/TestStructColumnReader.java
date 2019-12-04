@@ -50,6 +50,7 @@ import static io.prestosql.orc.OrcWriteValidation.OrcWriteValidationMode.BOTH;
 import static io.prestosql.orc.TestingOrcPredicate.ORC_ROW_GROUP_SIZE;
 import static io.prestosql.orc.TestingOrcPredicate.ORC_STRIPE_SIZE;
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static org.joda.time.DateTimeZone.UTC;
@@ -261,7 +262,7 @@ public class TestStructColumnReader
             throws IOException
     {
         OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), READER_OPTIONS);
-        OrcReader orcReader = new OrcReader(orcDataSource, READER_OPTIONS);
+        OrcReader orcReader = new OrcReader(orcDataSource, READER_OPTIONS, createNoOpConnectorOperationContext());
 
         OrcRecordReader recordReader = orcReader.createRecordReader(
                 orcReader.getRootColumn().getNestedColumns(),

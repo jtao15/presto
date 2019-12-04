@@ -17,6 +17,7 @@ import io.prestosql.FullConnectorSession;
 import io.prestosql.metadata.Metadata;
 import io.prestosql.security.AccessControl;
 import io.prestosql.spi.connector.ColumnHandle;
+import io.prestosql.spi.connector.ConnectorOperationContext;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorPageSourceProvider;
 import io.prestosql.spi.connector.ConnectorSession;
@@ -46,7 +47,8 @@ public class InformationSchemaPageSourceProvider
             ConnectorSession session,
             ConnectorSplit split,
             ConnectorTableHandle tableHandle,
-            List<ColumnHandle> columns)
+            List<ColumnHandle> columns,
+            ConnectorOperationContext connectorOperationContext)
     {
         return new InformationSchemaPageSource(
                 ((FullConnectorSession) session).getSession(),

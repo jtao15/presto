@@ -82,6 +82,7 @@ import static io.prestosql.plugin.hive.HiveType.HIVE_INT;
 import static io.prestosql.plugin.hive.HiveType.HIVE_STRING;
 import static io.prestosql.plugin.hive.util.HiveBucketing.BucketingVersion.BUCKETING_V1;
 import static io.prestosql.plugin.hive.util.HiveUtil.getRegularColumnHandles;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
 import static io.prestosql.spi.predicate.TupleDomain.withColumnDomains;
 import static io.prestosql.spi.type.IntegerType.INTEGER;
@@ -352,7 +353,8 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 threads,
                 false,
-                Optional.empty());
+                Optional.empty(),
+                createNoOpConnectorOperationContext());
 
         HiveSplitSource hiveSplitSource = hiveSplitSource(backgroundHiveSplitLoader);
         backgroundHiveSplitLoader.start(hiveSplitSource);
@@ -522,7 +524,8 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 2,
                 false,
-                validWriteIds);
+                validWriteIds,
+                createNoOpConnectorOperationContext());
     }
 
     private static BackgroundHiveSplitLoader backgroundHiveSplitLoader(List<LocatedFileStatus> files, DirectoryLister directoryLister)
@@ -548,7 +551,8 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 2,
                 false,
-                Optional.empty());
+                Optional.empty(),
+                createNoOpConnectorOperationContext());
     }
 
     private static BackgroundHiveSplitLoader backgroundHiveSplitLoaderOfflinePartitions()
@@ -568,7 +572,8 @@ public class TestBackgroundHiveSplitLoader
                 directExecutor(),
                 2,
                 false,
-                Optional.empty());
+                Optional.empty(),
+                createNoOpConnectorOperationContext());
     }
 
     private static Iterable<HivePartitionMetadata> createPartitionMetadataWithOfflinePartitions()

@@ -30,6 +30,7 @@ import io.prestosql.plugin.hive.HiveColumnHandle;
 import io.prestosql.plugin.hive.HivePageSourceFactory;
 import io.prestosql.plugin.hive.orc.OrcPageSource.ColumnAdaptation;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ConnectorOperationContext;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.FixedPageSource;
@@ -114,7 +115,8 @@ public class OrcPageSourceFactory
             Properties schema,
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone)
+            DateTimeZone hiveStorageTimeZone,
+            ConnectorOperationContext connectorOperationContext)
     {
         if (!isDeserializerClass(schema, OrcSerde.class)) {
             return Optional.empty();
@@ -146,7 +148,8 @@ public class OrcPageSourceFactory
                         .withLazyReadSmallRanges(getOrcLazyReadSmallRanges(session))
                         .withNestedLazy(isOrcNestedLazy(session))
                         .withBloomFiltersEnabled(isOrcBloomFiltersEnabled(session)),
-                stats));
+                stats,
+                connectorOperationContext));
     }
 
     private static OrcPageSource createOrcPageSource(
@@ -162,7 +165,8 @@ public class OrcPageSourceFactory
             TupleDomain<HiveColumnHandle> effectivePredicate,
             DateTimeZone hiveStorageTimeZone,
             OrcReaderOptions options,
-            FileFormatDataSourceStats stats)
+            FileFormatDataSourceStats stats,
+            ConnectorOperationContext connectorOperationContext)
     {
         for (HiveColumnHandle column : columns) {
             checkArgument(column.getColumnType() == REGULAR, "column type must be regular: %s", column);
@@ -190,7 +194,7 @@ public class OrcPageSourceFactory
 
         AggregatedMemoryContext systemMemoryUsage = newSimpleAggregatedMemoryContext();
         try {
-            OrcReader reader = new OrcReader(orcDataSource, options);
+            OrcReader reader = new OrcReader(orcDataSource, options, connectorOperationContext);
 
             if (useOrcColumnNames) {
                 verifyFileHasColumnNames(reader.getColumnNames(), path);

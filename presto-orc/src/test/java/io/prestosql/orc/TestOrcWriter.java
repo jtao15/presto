@@ -45,6 +45,7 @@ import static io.prestosql.orc.StripeReader.isIndexStream;
 import static io.prestosql.orc.TestingOrcPredicate.ORC_ROW_GROUP_SIZE;
 import static io.prestosql.orc.TestingOrcPredicate.ORC_STRIPE_SIZE;
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Math.toIntExact;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -98,7 +99,7 @@ public class TestOrcWriter
 
             // read the footer and verify the streams are ordered by size
             OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), READER_OPTIONS);
-            Footer footer = new OrcReader(orcDataSource, READER_OPTIONS).getFooter();
+            Footer footer = new OrcReader(orcDataSource, READER_OPTIONS, createNoOpConnectorOperationContext()).getFooter();
 
             for (StripeInformation stripe : footer.getStripes()) {
                 // read the footer

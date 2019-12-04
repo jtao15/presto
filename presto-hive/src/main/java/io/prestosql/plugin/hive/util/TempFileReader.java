@@ -30,6 +30,7 @@ import java.util.List;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.OrcReader.INITIAL_BATCH_SIZE;
 import static io.prestosql.plugin.hive.HiveErrorCode.HIVE_WRITER_DATA_ERROR;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static java.util.Objects.requireNonNull;
 import static org.joda.time.DateTimeZone.UTC;
 
@@ -43,7 +44,7 @@ public class TempFileReader
         requireNonNull(types, "types is null");
 
         try {
-            OrcReader orcReader = new OrcReader(dataSource, new OrcReaderOptions());
+            OrcReader orcReader = new OrcReader(dataSource, new OrcReaderOptions(), createNoOpConnectorOperationContext());
             reader = orcReader.createRecordReader(
                     orcReader.getRootColumn().getNestedColumns(),
                     types,

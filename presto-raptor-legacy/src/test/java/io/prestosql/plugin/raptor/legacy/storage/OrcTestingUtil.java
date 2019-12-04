@@ -32,6 +32,7 @@ import java.util.List;
 import static io.airlift.units.DataSize.Unit.MEGABYTE;
 import static io.prestosql.memory.context.AggregatedMemoryContext.newSimpleAggregatedMemoryContext;
 import static io.prestosql.orc.OrcReader.MAX_BATCH_SIZE;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static org.testng.Assert.assertEquals;
 
 final class OrcTestingUtil
@@ -54,7 +55,7 @@ final class OrcTestingUtil
     public static OrcRecordReader createReader(OrcDataSource dataSource, List<Long> columnIds, List<Type> types)
             throws IOException
     {
-        OrcReader orcReader = new OrcReader(dataSource, READER_OPTIONS);
+        OrcReader orcReader = new OrcReader(dataSource, READER_OPTIONS, createNoOpConnectorOperationContext());
 
         List<String> columnNames = orcReader.getColumnNames();
         assertEquals(columnNames.size(), columnIds.size());

@@ -30,6 +30,7 @@ import io.prestosql.rcfile.RcFileReader;
 import io.prestosql.rcfile.binary.BinaryRcFileEncoding;
 import io.prestosql.rcfile.text.TextRcFileEncoding;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ConnectorOperationContext;
 import io.prestosql.spi.connector.ConnectorPageSource;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.predicate.TupleDomain;
@@ -101,7 +102,8 @@ public class RcFilePageSourceFactory
             Properties schema,
             List<HiveColumnHandle> columns,
             TupleDomain<HiveColumnHandle> effectivePredicate,
-            DateTimeZone hiveStorageTimeZone)
+            DateTimeZone hiveStorageTimeZone,
+            ConnectorOperationContext connectorOperationContext)
     {
         RcFileEncoding rcFileEncoding;
         String deserializerClassName = getDeserializerClassName(schema);

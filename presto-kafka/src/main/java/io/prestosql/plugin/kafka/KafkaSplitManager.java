@@ -20,6 +20,7 @@ import com.google.common.io.CharStreams;
 import io.airlift.log.Logger;
 import io.prestosql.spi.HostAddress;
 import io.prestosql.spi.PrestoException;
+import io.prestosql.spi.connector.ConnectorOperationContext;
 import io.prestosql.spi.connector.ConnectorSession;
 import io.prestosql.spi.connector.ConnectorSplit;
 import io.prestosql.spi.connector.ConnectorSplitManager;
@@ -81,7 +82,7 @@ public class KafkaSplitManager
     }
 
     @Override
-    public ConnectorSplitSource getSplits(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorTableHandle table, SplitSchedulingStrategy splitSchedulingStrategy)
+    public ConnectorSplitSource getSplits(ConnectorTransactionHandle transaction, ConnectorSession session, ConnectorTableHandle table, SplitSchedulingStrategy splitSchedulingStrategy, ConnectorOperationContext connectorOperationContext)
     {
         KafkaTableHandle kafkaTableHandle = (KafkaTableHandle) table;
         try {

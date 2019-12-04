@@ -51,6 +51,7 @@ import static io.prestosql.orc.OrcTester.READER_OPTIONS;
 import static io.prestosql.orc.OrcTester.createCustomOrcRecordReader;
 import static io.prestosql.orc.OrcTester.createOrcRecordWriter;
 import static io.prestosql.orc.OrcTester.createSettableStructObjectInspector;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.BigintType.BIGINT;
 import static io.prestosql.spi.type.VarcharType.VARCHAR;
 import static java.lang.Math.min;
@@ -304,7 +305,7 @@ public class TestOrcReaderPositions
             createFileWithOnlyUserMetadata(tempFile.getFile(), metadata);
 
             OrcDataSource orcDataSource = new FileOrcDataSource(tempFile.getFile(), READER_OPTIONS);
-            OrcReader orcReader = new OrcReader(orcDataSource, READER_OPTIONS);
+            OrcReader orcReader = new OrcReader(orcDataSource, READER_OPTIONS, createNoOpConnectorOperationContext());
             Footer footer = orcReader.getFooter();
             Map<String, String> readMetadata = Maps.transformValues(footer.getUserMetadata(), Slice::toStringAscii);
             assertEquals(readMetadata, metadata);

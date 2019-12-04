@@ -53,6 +53,7 @@ import static io.prestosql.orc.OrcTester.Format.ORC_12;
 import static io.prestosql.orc.OrcTester.READER_OPTIONS;
 import static io.prestosql.orc.OrcTester.writeOrcColumnHive;
 import static io.prestosql.orc.metadata.CompressionKind.NONE;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.type.DecimalType.createDecimalType;
 import static java.util.UUID.randomUUID;
 
@@ -115,7 +116,7 @@ public class BenchmarkOrcDecimalReader
                 throws IOException
         {
             OrcDataSource dataSource = new FileOrcDataSource(dataPath, READER_OPTIONS);
-            OrcReader orcReader = new OrcReader(dataSource, READER_OPTIONS);
+            OrcReader orcReader = new OrcReader(dataSource, READER_OPTIONS, createNoOpConnectorOperationContext());
             return orcReader.createRecordReader(
                     orcReader.getRootColumn().getNestedColumns(),
                     ImmutableList.of(DECIMAL_TYPE),
