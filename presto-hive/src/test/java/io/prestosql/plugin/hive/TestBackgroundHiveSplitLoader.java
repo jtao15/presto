@@ -351,6 +351,7 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 threads,
                 false,
+                Optional.empty(),
                 Optional.empty());
 
         HiveSplitSource hiveSplitSource = hiveSplitSource(backgroundHiveSplitLoader);
@@ -521,7 +522,8 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 2,
                 false,
-                validWriteIds);
+                validWriteIds,
+                Optional.empty());
     }
 
     private static BackgroundHiveSplitLoader backgroundHiveSplitLoader(List<LocatedFileStatus> files, DirectoryLister directoryLister)
@@ -547,6 +549,7 @@ public class TestBackgroundHiveSplitLoader
                 EXECUTOR,
                 2,
                 false,
+                Optional.empty(),
                 Optional.empty());
     }
 
@@ -567,6 +570,7 @@ public class TestBackgroundHiveSplitLoader
                 directExecutor(),
                 2,
                 false,
+                Optional.empty(),
                 Optional.empty());
     }
 

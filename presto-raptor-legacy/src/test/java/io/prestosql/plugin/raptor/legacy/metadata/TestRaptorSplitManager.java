@@ -61,6 +61,7 @@ import static io.prestosql.metadata.MetadataManager.createTestMetadataManager;
 import static io.prestosql.plugin.raptor.legacy.metadata.DatabaseShardManager.shardIndexTable;
 import static io.prestosql.plugin.raptor.legacy.metadata.SchemaDaoUtil.createTablesWithRetry;
 import static io.prestosql.plugin.raptor.legacy.metadata.TestDatabaseShardManager.shardInfo;
+import static io.prestosql.spi.connector.ConnectorOperationContext.createNoOpConnectorOperationContext;
 import static io.prestosql.spi.connector.ConnectorSplitManager.SplitSchedulingStrategy.UNGROUPED_SCHEDULING;
 import static io.prestosql.spi.connector.NotPartitionedPartitionHandle.NOT_PARTITIONED;
 import static io.prestosql.spi.type.VarcharType.createVarcharType;
@@ -195,7 +196,7 @@ public class TestRaptorSplitManager
     private static ConnectorSplitSource getSplits(RaptorSplitManager splitManager, ConnectorTableHandle table)
     {
         ConnectorTransactionHandle transaction = new RaptorTransactionHandle();
-        return splitManager.getSplits(transaction, SESSION, table, UNGROUPED_SCHEDULING);
+        return splitManager.getSplits(transaction, SESSION, table, UNGROUPED_SCHEDULING, createNoOpConnectorOperationContext());
     }
 
     private static List<ConnectorSplit> getSplits(ConnectorSplitSource source, int maxSize)
