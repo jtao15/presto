@@ -126,6 +126,10 @@ public final class SystemSessionProperties
     public static final String DYNAMIC_FILTERING_MAX_PER_DRIVER_SIZE = "dynamic_filtering_max_per_driver_size";
     public static final String IGNORE_DOWNSTREAM_PREFERENCES = "ignore_downstream_preferences";
     public static final String QUERY_DEBUGGING_TRACER_ENABLED = "query_debugging_tracer_enabled";
+    public static final String QUERY_DEBUGGING_TRACER_FILTER_HOST_NAME = "query_debugging_tracer_filter_host_name";
+    public static final String QUERY_DEBUGGING_TRACER_FILTER_CATALOG_NAME = "query_debugging_tracer_filter_catalog_name";
+    public static final String QUERY_DEBUGGING_TRACER_FILTER_COMPONENET = "query_debugging_tracer_filter_component";
+    public static final String QUERY_DEBUGGING_TRACER_FILTER_EVENT_TYPE = "query_debugging_tracer_filter_event_type";
 
     private final List<PropertyMetadata<?>> sessionProperties;
 
